@@ -1,6 +1,6 @@
 # Mathematical Techniques for Structural Proteomics
-## Applying Convex Hull Layering to Time-Lapsed Proteolysis
-
+## Layering 3D Protein Structures to Better Analyze Time-Lapsed Proteolysis
+### Convex Hulls
 convex hull = smallest convex shape that contains the given set of points
 
 Let S be a set of points (for biomolecules, S = atomic coordinates extracted from a .pdb file).
