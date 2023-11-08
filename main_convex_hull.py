@@ -7,10 +7,36 @@ import plotly.graph_objs as go
 import ast
 import re
 
+# Amino Acid Hydrophobicity Scale (Kyte-Doolittle scale)
+hydrophobicity_values = {
+    'A': 1.8, 'R': -4.5, 'N': -3.5, 'D': -3.5, 'C': 2.5,
+    'Q': -3.5, 'E': -3.5, 'G': -0.4, 'H': -3.2, 'I': 4.5,
+    'L': 3.8, 'K': -3.9, 'M': 1.9, 'F': 2.8, 'P': -1.6,
+    'S': -0.8, 'T': -0.7, 'W': -0.9, 'Y': -1.3, 'V': 4.2,
+    'O': 0.0, # assign value to Pyrrolsine based on literature, not part of standard scale
+    'U': 0.0  # assign value to Selenocysteine based on literature, not part of standard scale
+}
+
+
 p=PDBParser()
 
 # GSTP1 AlphaFold structure for test
 structure=p.get_structure('AF-A0A087X243-F1-model_v4', r"C:\Users\Sabrina\PycharmProjects\convexhull\venv\AF-A0A087X243-F1-model_v4.pdb")
+
+# Extract amino acid sequence from the first model and chain (you can modify this based on your structure)
+amino_acid_sequence = ""
+for model in structure:
+    for chain in model:
+        for residue in chain:
+            # Check if the residue is an amino acid (exclude water molecules, ligands, etc.)
+            if residue.get_id()[0] == " " and residue.get_resname() not in ["HOH", "H2O", "WAT"]:
+                amino_acid_sequence += residue.get_resname()
+
+print("Amino Acid Sequence:", amino_acid_sequence)
+# Create an array of hydrophobicity values based on the amino acid sequence
+hydrophobicity_array = [hydrophobicity_values[aa] for aa in amino_acid_sequence]
+
+print(hydrophobicity_array)
 
 # backbone atoms
 points = []
@@ -43,6 +69,7 @@ with open("peptides.tsv") as file:
 peptide = peptides[2]
 vectors = peptide[1:13]
 # print(f"Time-Lapsed Peptide-to-Centroid Distances: {vectors}")
+
 input_line = []
 with open("pep_cleave_coordinates_10292023.csv") as file:
     reader = csv.reader(file, delimiter=",")
@@ -232,3 +259,34 @@ if __name__ == "__main__":
     # Show the interactive 3D plot
     fig.show()
 
+    # Create Plotly 3D surface plot for the entire structure (single hull)
+    avg_hydrophobicity = np.mean(hydrophobicity_array)
+    trace_hull_hydrophobicity = go.Mesh3d(
+        x=points[:, 0],
+        y=points[:, 1],
+        z=points[:, 2],
+        opacity=0.5,
+        colorscale='Viridis',
+        intensity=hydrophobicity_array,
+        cmin=min(hydrophobicity_array),
+        cmax=max(hydrophobicity_array),
+        name='Protein Structure (Hydrophobicity Mapping)'
+    )
+
+    # Create a layout with scene settings for 3D interaction
+    layout = go.Layout(
+        scene=dict(
+            aspectmode="data",
+            xaxis=dict(title='X'),
+            yaxis=dict(title='Y'),
+            zaxis=dict(title='Z')
+        ),
+        legend=dict(x=0.85, y=0.95),
+        title='Protein Structure with Hydrophobicity Mapping'
+    )
+
+    # Create the figure and add traces (including the new trace_hull_hydrophobicity)
+    fig = go.Figure(data=[trace_hull_hydrophobicity] + trace_hulls, layout=layout)
+
+    # Show the interactive 3D plot
+    fig.show()
