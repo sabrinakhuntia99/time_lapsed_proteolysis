@@ -20,8 +20,8 @@ hydrophobicity_values = {
 
 p=PDBParser()
 
-# GSTP1 AlphaFold structure for test
-structure=p.get_structure('AF-A0A087X243-F1-model_v4', r"C:\Users\Sabrina\PycharmProjects\convexhull\venv\AF-A0A087X243-F1-model_v4.pdb")
+#  AlphaFold structure for test
+structure=p.get_structure('AF-O60361-F1-model_v4', r"C:\Users\Sabrina\PycharmProjects\convexhull\venv\AF-O60361-F1-model_v4.pdb")
 
 # Extract amino acid sequence from the first model and chain (you can modify this based on your structure)
 amino_acid_sequence = ""
@@ -130,6 +130,7 @@ for line in input_line[1::]:
                 peptideDict[columns[indexCounter]] = ptsDict
         indexCounter += 1
     peptideList.append(peptideDict)
+print(peptideList)
 
 def convex_hull_peeling(points):
     #print(len(points))
@@ -191,20 +192,31 @@ if __name__ == "__main__":
             print(f"Vector Distances (from Centroid): {vectors}")
             print(f"Peptide Detection within Hull by Timepoint: {within_max_distance}")
 
-    # Extract vector coordinates
-    vector_points = np.array([ast.literal_eval(vector) for vector in vectors])
+    # Extract XYZ coordinates from peptideList
+    peptide_x = []
+    peptide_y = []
+    peptide_z = []
 
-    # Reshape vector_points to a 2-dimensional array
-    vector_points = vector_points.reshape(-1, 3)
+    for peptide_dict in peptideList:
+        for key, value in peptide_dict.items():
+            if key.startswith('pts'):
+                peptide_x.append(value['x'])
+                peptide_y.append(value['y'])
+                peptide_z.append(value['z'])
 
-    # Create a Plotly 3D scatter plot for vector points
-    trace_vectors = go.Scatter3d(
-        x=vector_points[:, 0],
-        y=vector_points[:, 1],
-        z=vector_points[:, 2],
+    # Convert the peptide coordinates to NumPy arrays
+    peptide_x = np.array(peptide_x)
+    peptide_y = np.array(peptide_y)
+    peptide_z = np.array(peptide_z)
+
+    # Create a Plotly  plot for peptide coordinates
+    trace_peptide = go.Scatter3d(
+        x=peptide_x,
+        y=peptide_y,
+        z=peptide_z,
         mode='markers',
-        marker=dict(size=3, color='blue', opacity=0.8),
-        name='Vector Points'
+        marker=dict(size=3, color='green', opacity=0.8),
+        name='Peptide Coordinates'
     )
 
     # Create a Plotly 3D scatter plot for atomic coordinates
@@ -222,12 +234,11 @@ if __name__ == "__main__":
         x=points[:, 0],
         y=points[:, 1],
         z=points[:, 2],
-        mode='lines',
+        mode='markers',
         marker=dict(color='black', opacity=1),
         name='Amino Acid Backbone'
     )
-
-    # Create Plotly 3D surface plots for all peeled convex hulls with different opacities
+    # Create Plotly 3D surface plots for all peeled convex hulls with different opacities and blue gradient
     trace_hulls = []
     opacities = np.linspace(0.1, 0.8, len(layers))
     for i, hull_points in enumerate(layers):
@@ -237,24 +248,37 @@ if __name__ == "__main__":
             y=hull_points[:, 1],
             z=hull_points[:, 2],
             opacity=opacity,
-            name=f'Hull {i + 1}'
+            name=f'Hull {i + 1}',
+            colorscale=[[0, 'navy'], [1, 'deepskyblue']],  # Blue gradient
         )
         trace_hulls.append(trace_hull)
 
-    # Create a layout with scene settings for 3D interaction
+    # Create a layout with scene settings for 3D interaction, setting a black background
     layout = go.Layout(
         scene=dict(
-            aspectmode="data",
-            xaxis=dict(title='X'),
-            yaxis=dict(title='Y'),
-            zaxis=dict(title='Z')
+            xaxis=dict(title='X', backgroundcolor="black", gridcolor="gray", showgrid=False),
+            yaxis=dict(title='Y', backgroundcolor="black", gridcolor="gray", showgrid=False),
+            zaxis=dict(title='Z', backgroundcolor="black", gridcolor="gray", showgrid=False),
+            bgcolor='black',
+            aspectmode="cube",
         ),
-        legend=dict(x=0.85, y=0.95)
+        paper_bgcolor='black',
+        plot_bgcolor='black',
+        showlegend=True,
+        legend=dict(x=0.85, y=0.95),
     )
 
-    # Create the figure and add traces (including the new trace_vectors)
-    fig = go.Figure(data=[trace_atomic, trace_amino_acid, trace_vectors] + trace_hulls,
-                    layout=layout)
+    # Create the figure and add traces with square-like markers for different components
+    fig = go.Figure(
+        data=[trace_atomic, trace_amino_acid, trace_peptide] + trace_hulls,
+        layout=layout
+    )
+
+    # Change markers to square-like for atomic coordinates
+    fig.update_traces(marker=dict(symbol='square', size=3, color='grey', opacity=0.25), selector=dict(type='scatter3d'))
+    # Change markers to square-like, white, and glowy for amino acid backbone
+    fig.update_traces(marker=dict(symbol='square', size=5, color='white', opacity=1, line=dict(color='white', width=1)),
+                      selector=dict(name='Amino Acid Backbone'))
 
     # Show the interactive 3D plot
     fig.show()
