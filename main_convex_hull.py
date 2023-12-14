@@ -1,21 +1,11 @@
+
 from __future__ import division
 from scipy.spatial import ConvexHull, Delaunay
 from Bio.PDB import *
 import numpy as np
 import csv
-import plotly.graph_objs as go
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+import plotly.graph_objects as go
 import matplotlib.pyplot as plt
-
-# Amino Acid Hydrophobicity Scale (Kyte-Doolittle scale)
-hydrophobicity_values = {
-    'A': 1.8, 'R': -4.5, 'N': -3.5, 'D': -3.5, 'C': 2.5,
-    'Q': -3.5, 'E': -3.5, 'G': -0.4, 'H': -3.2, 'I': 4.5,
-    'L': 3.8, 'K': -3.9, 'M': 1.9, 'F': 2.8, 'P': -1.6,
-    'S': -0.8, 'T': -0.7, 'W': -0.9, 'Y': -1.3, 'V': 4.2,
-    'O': 0.0, # not in this sequence
-    'U': 0.0 # not in this sequence
-}
 
 
 p=PDBParser()
@@ -33,10 +23,6 @@ for model in structure:
                 amino_acid_sequence += residue.get_resname()
 
 print("Amino Acid Sequence:", amino_acid_sequence)
-# Create an array of hydrophobicity values based on the amino acid sequence
-hydrophobicity_array = [hydrophobicity_values[aa] for aa in amino_acid_sequence]
-
-print(hydrophobicity_array)
 
 # backbone atoms
 points = []
@@ -68,7 +54,6 @@ with open("peptides.tsv") as file:
 
 peptide = peptides[2]
 vectors = peptide[1:13]
-# print(f"Time-Lapsed Peptide-to-Centroid Distances: {vectors}")
 
 input_line = []
 
@@ -136,20 +121,6 @@ xList = []
 yList = []
 zList = []
 
-# for peptide in peptideList:
-#     print(peptide['name'])
-#     for i in peptide:
-#         if i != 'name':  # Skip the 'name' key
-#             pointsInPeptide = peptide[i]
-#             for point in pointsInPeptide:
-#                 currentPoint = pointsInPeptide[point]
-#                 print('Coordinates:', currentPoint['x'], ",", currentPoint['y'], ",", currentPoint['z'])
-#
-# i = 0
-# while i < len(xList):
-#     print('Coordinates:', xList[i], ",", yList[i], ",", zList[i])
-#     i += 1
-
 
 peptide_O60361_available = False  # Flag to track availability
 
@@ -167,24 +138,22 @@ if not peptide_O60361_available:
     print("Peptide O60361 data not found.")
 
 
-#print(peptideList)
-
 def convex_hull_peeling(points):
-    #print(len(points))
     hull = ConvexHull(points)
-    vertices = np.copy(hull.vertices) # np.copy function makes an array copy of object
-    hull_points = np.copy(points[vertices]) # np.copy function makes an array copy of object
-    #print(len(hull_points)) # value should be <= len(points)
-    layers = [hull_points] # defines list
-    # change to
-    # while distance b/w any 2 points w/in the hull >= smallest length of amino acid in structure
-    while len(hull_points) > 11:
+    vertices = np.copy(hull.vertices)
+    hull_points = np.copy(points[vertices])
+    layers = [hull_points]
+
+    min_points_percentage = 0.1  # Adjust this percentage as needed
+    min_points = int(len(points) * min_points_percentage)
+
+    while len(hull_points) > min_points:
         try:
-            new_hull = ConvexHull(hull_points) # calculate convex hull
-            vertices =  np.copy(new_hull.vertices) # makes an array copy of new hull vertices
-            hull_points = np.copy(points[vertices]) # makes an array copy of new hull coordinates
+            new_hull = ConvexHull(hull_points)
+            vertices = np.copy(new_hull.vertices)
+            hull_points = np.copy(points[vertices])
             print(len(hull_points))
-            layers.append(hull_points) # add to previous layer
+            layers.append(hull_points)
         except:
             break
 
@@ -197,141 +166,93 @@ def check_vectors_within_max_distance(vectors, max_distance):
     within_max_distance = [np.linalg.norm(vector) <= max_distance for vector in vectors]
     return within_max_distance
 
-# Function for Delaunay tessellation peeling
-
-def delaunay_tessellation_peeling(points):
-    tri = Delaunay(points)
-    simplices = np.copy(tri.simplices)
-    shells = [points[simplices]]
-    while len(simplices) > 4:
-        try:
-            tri = Delaunay(points[simplices.flatten()])
-            simplices = np.copy(tri.simplices)
-            layers.append(points[simplices])
-        except:
-            break
-    return shells
-
-
-
 
 
 if __name__ == "__main__":
 
-    # Apply Delaunay triangulation
-    tri = Delaunay(points)
-
-    # Get the vertices of the tetrahedra
-    tetrahedra = points[tri.simplices]
-
-    # Create a 3D plot using Matplotlib
-    fig = plt.figure(figsize=(8, 6))
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Plot the Delaunay triangulation in Matplotlib
-    ax.scatter(points[:, 0], points[:, 1], points[:, 2], c='red', marker='o', s=50)
-    ax.add_collection3d(Poly3DCollection(tetrahedra, facecolors='cyan', linewidths=1, edgecolors='r', alpha=0.25))
-
-
-    ax.set_title('Delaunay Triangulation')
-    ax.set_xlabel('X-axis')
-    ax.set_ylabel('Y-axis')
-    ax.set_zlabel('Z-axis')
-    ax.grid()
-
-    plt.show()
-
-    num_points = len(points)
-
-    # Perform convex hull peeling)
+    # Perform convex hull peeling
     layers = convex_hull_peeling(points)
-    # Define a uniform thickness value for all hulls
-    # uniform_thickness = 0.5
+    print("Number of Hulls:", len(layers))
 
-    # Perform Delaunay tessellation peeling
-    delaunay_layers = delaunay_tessellation_peeling(points)
+    # Initialize lists to store coordinates
+    x_coordinates = []
+    y_coordinates = []
+    z_coordinates = []
 
-    # Check if each vector is within the maximum distance for each layer
-    for vector in vectors:
-        for layer in layers:
-            # Calculate the centroid of the current hull layer
-            centroid = np.mean(layer, axis=0)
-
-            # Calculate the sets of boundary points for the current hull
-            hull = ConvexHull(layer)
-            boundary_points = layer[hull.vertices]
-
-            # Calculate the maximum distance from the centroid to any point on the hull
-            max_distance = calculate_max_distance_to_hull(centroid, boundary_points)  # Define max_distance here
-            # adjusted_max_distance = max_distance + uniform_thickness
-
-            # Check if each vector is within the maximum distance
-            within_max_distance = check_vectors_within_max_distance(vectors, max_distance)
-            # adj_within_max_distance = check_vectors_within_max_distance(vectors, adjusted_max_distance)
-
-            # Print the results for the current hull layer
-            #print(f"Hull Boundary (from Centroid): {max_distance}")
-            #print(f"Vector Distances (from Centroid): {vectors}")
-            #print(f"Peptide Detection within Hull by Timepoint: {within_max_distance}")
-
-    # Extract XYZ coordinates from peptideList
-    peptide_x = []
-    peptide_y = []
-    peptide_z = []
-
-    for peptide_dict in peptideList:
-        for key, value in peptide_dict.items():
-            if key.startswith('pts'):
-                peptide_x.append(value['x'])
-                peptide_y.append(value['y'])
-                peptide_z.append(value['z'])
-
-    # Convert the peptide coordinates to NumPy arrays
-    peptide_x = np.array(peptide_x)
-    peptide_y = np.array(peptide_y)
-    peptide_z = np.array(peptide_z)
-
-    # Create a Plotly  plot for peptide coordinates
-    trace_peptide = go.Scatter3d(
-        x=peptide_x,
-        y=peptide_y,
-        z=peptide_z,
-        mode='markers',
-        marker=dict(size=3, color='green', opacity=0.8),
-        name='Peptide Coordinates'
-    )
-
-    # Extract coordinates for peptide O60361
-    peptide_O60361_x = []
-    peptide_O60361_y = []
-    peptide_O60361_z = []
+    # Initialize lists to store line segment coordinates
+    peptide_lines_x = []
+    peptide_lines_y = []
+    peptide_lines_z = []
 
     # Extract coordinates for peptide O60361 from the peptideList
-    for peptide_dict in peptideList:
-        if peptide_dict['name'] == 'O60361':  # Check for the peptide name
-            for key, value in peptide_dict.items():
-                if key.startswith('pts'):
-                    peptide_O60361_x.append(value['x'])
-                    peptide_O60361_y.append(value['y'])
-                    peptide_O60361_z.append(value['z'])
+    peptide_coordinates = []  # List to store extracted coordinates
 
-    # Convert the peptide O60361 coordinates to NumPy arrays
-    peptide_O60361_x = np.array(peptide_O60361_x)
-    peptide_O60361_y = np.array(peptide_O60361_y)
-    peptide_O60361_z = np.array(peptide_O60361_z)
-    print('O60361 Coordinates:', peptide_O60361_x, ",", peptide_O60361_y, ",",  peptide_O60361_z)
+    # Initialize a list to store line segments as tuples of start and end points
+    peptide_lines = []
 
-    # Plot peptide O60361 coordinates onto the existing convex hull plot
-    trace_peptide_O60361 = go.Scatter3d(
-        x=peptide_O60361_x,
-        y=peptide_O60361_y,
-        z=peptide_O60361_z,
+    # Extract coordinates for peptide O60361 from the peptideList
+    for peptide in peptideList:
+        if peptide['name'] == 'O60361':  # Check for the peptide name
+            peptide_O60361_available = True  # Set the flag if found
+            for i in peptide:
+                if i != 'name':  # Skip the 'name' key
+                    pointsInPeptide = peptide[i]
+                    for point in pointsInPeptide:
+                        currentPoint = pointsInPeptide[point]
+                        # Extract coordinates and append to the list
+                        peptide_coordinates.append((currentPoint['x'], currentPoint['y'], currentPoint['z']))
+
+            # Create line segments from the extracted coordinates
+            for i in range(0, len(peptide_coordinates) - 1, 2):
+                start_point = peptide_coordinates[i]
+                end_point = peptide_coordinates[i + 1]
+
+                # Append each start and end point as a separate tuple
+                peptide_lines.extend([start_point, end_point])
+            print(peptide_lines)
+
+    if not peptide_O60361_available:
+        print("Peptide O60361 data not found.")
+    else:
+        # Create traces for line segments of peptide O60361
+        trace_peptide_lines = go.Scatter3d(
+            x=[point[0] for point in peptide_lines],  # X-coordinates for start and end points
+            y=[point[1] for point in peptide_lines],  # Y-coordinates for start and end points
+            z=[point[2] for point in peptide_lines],  # Z-coordinates for start and end points
+            mode='lines',
+            line=dict(color='red', width=9),
+            name='Detected Peptides'
+        )
+    # Create a trace for peptide O60361 coordinates
+    trace_peptide_O60361_start = go.Scatter3d(
+        x=[point[0] for point in peptide_coordinates[::2]],  # X-coordinates for start points
+        y=[point[1] for point in peptide_coordinates[::2]],  # Y-coordinates for start points
+        z=[point[2] for point in peptide_coordinates[::2]],  # Z-coordinates for start points
         mode='markers',
-        marker=dict(size=3, color='orange', opacity=0.8),
-        name='Peptide O60361 Coordinates'
+        marker=dict(size=10, color='rosybrown', opacity=1, symbol='square', line=dict(color='rosybrown', width=2)),
+        name='Start Points'
     )
 
-    # Create a Plotly 3D scatter plot for atomic coordinates
+    trace_peptide_O60361_end = go.Scatter3d(
+        x=[point[0] for point in peptide_coordinates[1::2]],  # X-coordinates for end points
+        y=[point[1] for point in peptide_coordinates[1::2]],  # Y-coordinates for end points
+        z=[point[2] for point in peptide_coordinates[1::2]],  # Z-coordinates for end points
+        mode='markers',
+        marker=dict(size=10, color='crimson', opacity=1, symbol='square', line=dict(color='crimson', width=2)),
+        name='End Points'
+    )
+
+    # Printing the coordinates used in the traces
+    print("Start Points Coordinates:")
+    for x, y, z in zip(trace_peptide_O60361_start['x'], trace_peptide_O60361_start['y'],
+                       trace_peptide_O60361_start['z']):
+        print(f"({x}, {y}, {z})")
+
+    print("\nEnd Points Coordinates:")
+    for x, y, z in zip(trace_peptide_O60361_end['x'], trace_peptide_O60361_end['y'], trace_peptide_O60361_end['z']):
+        print(f"({x}, {y}, {z})")
+
+
     trace_atomic = go.Scatter3d(
         x=points0[:, 0],
         y=points0[:, 1],
@@ -341,16 +262,16 @@ if __name__ == "__main__":
         name='Atomic Coordinates'
     )
 
-    # Create a Plotly 3D line plot for amino acid coordinates
     trace_amino_acid = go.Scatter3d(
         x=points[:, 0],
         y=points[:, 1],
         z=points[:, 2],
         mode='markers',
-        marker=dict(color='black', opacity=1),
+        marker=dict(size=5, color='white', opacity=1, symbol='square', line=dict(color='white', width=2)),
         name='Amino Acid Backbone'
     )
-    # Create Plotly 3D surface plots for all peeled convex hulls with different opacities and blue gradient
+
+    # Create traces for hulls
     trace_hulls = []
     opacities = np.linspace(0.1, 0.8, len(layers))
     for i, hull_points in enumerate(layers):
@@ -361,56 +282,32 @@ if __name__ == "__main__":
             z=hull_points[:, 2],
             opacity=opacity,
             name=f'Hull {i + 1}',
-            colorscale=[[0, 'navy'], [1, 'deepskyblue']],  # Blue gradient
+            colorscale=[[0, 'lightblue'], [1, 'deepskyblue']],
         )
         trace_hulls.append(trace_hull)
 
-    # Create a layout with scene settings for 3D interaction, setting a black background
-    layout = go.Layout(
-        scene=dict(
-            xaxis=dict(title='X', backgroundcolor="black", gridcolor="gray", showgrid=False),
-            yaxis=dict(title='Y', backgroundcolor="black", gridcolor="gray", showgrid=False),
-            zaxis=dict(title='Z', backgroundcolor="black", gridcolor="gray", showgrid=False),
-            bgcolor='black',
-            aspectmode="cube",
-        ),
-        paper_bgcolor='black',
-        plot_bgcolor='black',
-        showlegend=True,
-        legend=dict(x=0.85, y=0.95),
-    )
+    # Calculate centroid of the points
+    centroid = np.mean(points, axis=0)
 
-    # Create the figure and add traces with square-like markers for different components
-    fig = go.Figure(
-        data=[trace_atomic, trace_amino_acid, trace_peptide_O60361] + trace_hulls,
-        layout=layout
-    )
-
-    # Change markers to square-like for atomic coordinates
-    fig.update_traces(marker=dict(symbol='square', size=3, color='grey', opacity=0.25), selector=dict(type='scatter3d'))
-    # Change markers to square-like, white, and glowy for amino acid backbone
-    fig.update_traces(marker=dict(symbol='square', size=5, color='white', opacity=1, line=dict(color='white', width=1)),
-                      selector=dict(name='Amino Acid Backbone'))
-
-
-    # Show the interactive 3D plot
-    fig.show()
-
-    # Plot peptide O60361 coordinates onto the existing convex hull plot
-    trace_peptide_O60361 = go.Scatter3d(
-        x=peptide_O60361_x,
-        y=peptide_O60361_y,
-        z=peptide_O60361_z,
+    # Create a trace for the centroid point
+    trace_centroid = go.Scatter3d(
+        x=[centroid[0]],  # X-coordinate of the centroid
+        y=[centroid[1]],  # Y-coordinate of the centroid
+        z=[centroid[2]],  # Z-coordinate of the centroid
         mode='markers',
-        marker=dict(size=3, color='orange', opacity=0.8),
-        name='Peptide O60361 Coordinates'
+        marker=dict(size=10, color='purple', opacity=1, symbol='square', line=dict(color='purple', width=2)),
+        name='Centroid'
     )
 
-    # Assuming you have the existing convex hull plot in the variable trace_hull
-    combined_data = [trace_hull, trace_peptide_O60361]
 
-    # Layout settings for 3D interaction
+
+    # Combine relevant traces into a single list
+    combined_data = [trace_atomic, trace_amino_acid] + trace_hulls + [trace_peptide_O60361_start, trace_peptide_O60361_end, trace_peptide_lines]
+    combined_data_with_centroid = combined_data + [trace_centroid]
+
+    # Create the layout
     layout = go.Layout(
+        title=("UNIPROT_ID O60361"),
         scene=dict(
             xaxis=dict(title='X', backgroundcolor="black", gridcolor="gray", showgrid=False),
             yaxis=dict(title='Y', backgroundcolor="black", gridcolor="gray", showgrid=False),
@@ -424,119 +321,49 @@ if __name__ == "__main__":
         legend=dict(x=0.85, y=0.95),
     )
 
-    # Create the figure with combined data (convex hull and peptide coordinates)
-    fig = go.Figure(data=combined_data, layout=layout)
+    # Create the figure with combined data
+    fig = go.Figure(data=combined_data_with_centroid, layout=layout)
 
     # Show the interactive 3D plot
     fig.show()
 
-    # Create Plotly 3D surface plots for all Delaunay layers with different opacities and blue gradient
-    trace_delaunay_layers = []
-    opacities = np.linspace(0.1, 0.8, len(delaunay_layers))
-    for i, layer_points in enumerate(delaunay_layers):
-        opacity = opacities[i]
-        trace_layer = go.Mesh3d(
-            x=layer_points[:, 0],
-            y=layer_points[:, 1],
-            z=layer_points[:, 2],
-            opacity=opacity,
-            name=f'Layer {i + 1}',
-            colorscale=[[0, 'navy'], [1, 'deepskyblue']],  # Blue gradient
+    # List to store which hull each peptide point is in
+    peptide_point_hull_assignments = []
+
+    # Assuming 'peptide_coordinates' contains the points of interest within the peptide
+    for point in peptide_coordinates:
+        found_hull = None
+        for j, hull_points in enumerate(layers):
+            hull = ConvexHull(hull_points)
+            all_on_same_side = all(
+                np.dot(eq[:-1], point) + eq[-1] <= 0 for eq in hull.equations
+            )
+            if all_on_same_side:
+                found_hull = j + 1
+                break
+
+        if found_hull is not None:
+            peptide_point_hull_assignments.append(f"Point {point} is in Hull {found_hull}")
+        else:
+            peptide_point_hull_assignments.append(f"Point {point} is not in any hull")
+
+    # Print which hulls the peptide points are detected in
+    for assignment in peptide_point_hull_assignments:
+        print(assignment)
+
+    # Check which hull the centroid is in
+    centroid_hull_assignment = None
+    for i, hull_points in enumerate(layers):
+        hull = ConvexHull(hull_points)
+        is_inside_hull = all(
+            np.dot(eq[:-1], centroid) + eq[-1] <= 0 for eq in hull.equations
         )
-        trace_delaunay_layers.append(trace_layer)
+        if is_inside_hull:
+            centroid_hull_assignment = f"Centroid is in Hull {i + 1}"
+            break
 
-    # Create a layout with scene settings for 3D interaction, setting a black background
-    layout = go.Layout(
-        scene=dict(
-            xaxis=dict(title='X', backgroundcolor="black", gridcolor="gray", showgrid=False),
-            yaxis=dict(title='Y', backgroundcolor="black", gridcolor="gray", showgrid=False),
-            zaxis=dict(title='Z', backgroundcolor="black", gridcolor="gray", showgrid=False),
-            bgcolor='black',
-            aspectmode="cube",
-        ),
-        paper_bgcolor='black',
-        plot_bgcolor='black',
-        showlegend=True,
-        legend=dict(x=0.85, y=0.95),
-    )
+    if centroid_hull_assignment is not None:
+        print(centroid_hull_assignment)
+    else:
+        print("Centroid is not inside any hull")
 
-    # Create the figure and add traces with square-like markers for different components
-    fig = go.Figure(
-        data=[trace_atomic, trace_amino_acid, trace_peptide] + trace_delaunay_layers,  # Replace trace_hulls
-        layout=layout
-    )
-
-    # Change markers to square-like for atomic coordinates
-    fig.update_traces(marker=dict(symbol='square', size=3, color='grey', opacity=0.25), selector=dict(type='scatter3d'))
-    # Change markers to square-like, white, and glowy for amino acid backbone
-    fig.update_traces(marker=dict(symbol='square', size=5, color='white', opacity=1, line=dict(color='white', width=1)),
-                      selector=dict(name='Amino Acid Backbone'))
-
-    # Show the interactive 3D plot
-    fig.show()
-
-    # Create Plotly 3D surface plot for the entire structure (single hull)
-    avg_hydrophobicity = np.mean(hydrophobicity_array)
-    trace_hull_hydrophobicity = go.Mesh3d(
-        x=points[:, 0],
-        y=points[:, 1],
-        z=points[:, 2],
-        opacity=0.5,
-        colorscale='Viridis',
-        intensity=hydrophobicity_array,
-        cmin=min(hydrophobicity_array),
-        cmax=max(hydrophobicity_array),
-        name='Protein Structure (Hydrophobicity Mapping)'
-    )
-
-    # Create a layout with scene settings for 3D interaction
-    layout = go.Layout(
-        scene=dict(
-            aspectmode="data",
-            xaxis=dict(title='X'),
-            yaxis=dict(title='Y'),
-            zaxis=dict(title='Z')
-        ),
-        legend=dict(x=0.85, y=0.95),
-        title='Protein Structure with Hydrophobicity Mapping'
-    )
-
-    # Create the figure and add traces (including the new trace_hull_hydrophobicity)
-    fig = go.Figure(data=[trace_hull_hydrophobicity] + trace_hulls, layout=layout)
-
-    # Show the interactive 3D plot
-    fig.show()
-
-# Calculate average hydrophobicity for the entire structure
-avg_hydrophobicity = np.mean(hydrophobicity_array)
-
-# Create a Plotly 3D surface plot for a single Delaunay tessellation layer
-trace_delaunay_hydrophobicity = go.Mesh3d(
-    x=delaunay_layers[0][:, 0],  # Assuming the first layer from Delaunay tessellation
-    y=delaunay_layers[0][:, 1],
-    z=delaunay_layers[0][:, 2],
-    opacity=0.5,
-    colorscale='Viridis',
-    intensity=hydrophobicity_array,  # Use hydrophobicity values for intensity
-    cmin=min(hydrophobicity_array),
-    cmax=max(hydrophobicity_array),
-    name='Protein Structure (Hydrophobicity Mapping)'
-)
-
-# Create a layout with scene settings for 3D interaction
-layout = go.Layout(
-    scene=dict(
-        aspectmode="data",
-        xaxis=dict(title='X'),
-        yaxis=dict(title='Y'),
-        zaxis=dict(title='Z')
-    ),
-    legend=dict(x=0.85, y=0.95),
-    title='Protein Structure with Hydrophobicity Mapping'
-)
-
-# Create the figure and add traces (including the new trace_delaunay_hydrophobicity)
-fig = go.Figure(data=[trace_delaunay_hydrophobicity], layout=layout)
-
-# Show the interactive 3D plot
-fig.show()
