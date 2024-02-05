@@ -42,3 +42,4 @@ def conv_array_text(string_from_csv):
         return converted_list
     else:
         return []
+
