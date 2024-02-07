@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import pandas as pd
 from util_func import conv_array_text,conv_array_coord, extract_aa_sequence, extract_all_atoms, extract_backbone_atoms
 from calc_func import convex_hull_peeling
-from graph_func import plot_xyz_coordinates_with_time_and_hulls
+from graph_func import plot_xyz_coordinates_with_time_and_hulls, plot_hulls_for_time_points
 
 p = PDBParser()
 
@@ -41,3 +41,6 @@ print(conv_peptide_coord)
 # Plot proteolysis data onto layered structure
 hull_layers = convex_hull_peeling(points)
 plot_xyz_coordinates_with_time_and_hulls(conv_peptide_coord, hull_layers)
+
+# Check for pattern by graphing layers at each time point
+plot_hulls_for_time_points(conv_peptide_coord, hull_layers)
