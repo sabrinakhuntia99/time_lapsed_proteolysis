@@ -1,26 +1,53 @@
-# Initialize a list to store line segments as tuples of start and end points
-peptide_lines = []
+import plotly.graph_objs as go
 
-# Extract coordinates for peptide O60361 from the peptideList
-for peptide in peptideList:
-    if peptide[0] == 'O60361':  # Check for the peptide name
-        peptide_O60361_available = True  # Set the flag if found
-        for i in peptide:
-            if i != 'name':  # Skip the 'name' key
-                pointsInPeptide = peptide[i]
-                for point in pointsInPeptide
-            peptide_lines.extend([start_point, end_point])
-        print(peptide_lines)
+def plot_xyz_coordinates_with_time_and_hulls(data, hull_layers):
+    # Create an empty list to store traces
+    traces = []
 
-if not peptide_available:
-    print("Peptide data not found.")
-else:
-    # Create traces for line segments of peptide O60361
-    trace_peptide_lines = go.Scatter3d(
-        x=[point[0] for point in peptide_lines],  # X-coordinates for start and end points
-        y=[point[1] for point in peptide_lines],  # Y-coordinates for start and end points
-        z=[point[2] for point in peptide_lines],  # Z-coordinates for start and end points
-        mode='lines',
-        line=dict(color='red', width=9),
-        name='Detected Peptides'
+    # Iterate over the data list
+    for time_point_data in data:
+        # Extract time point name and coordinates
+        time_point = time_point_data['TimePoint']
+        X = time_point_data['X']
+        Y = time_point_data['Y']
+        Z = time_point_data['Z']
+
+        # Create a scatter trace for the coordinates
+        trace = go.Scatter3d(
+            x=[X],
+            y=[Y],
+            z=[Z],
+            mode='markers',
+            marker=dict(size=5, color='blue'),  # Adjust marker size and color as needed
+            name=f'Time Point: {time_point}'  # Include the time point name in the trace name
+        )
+        traces.append(trace)
+
+    # Create a trace for each hull layer
+    for i, hull_points in enumerate(hull_layers):
+        trace_hull = go.Mesh3d(
+            x=hull_points[:, 0],
+            y=hull_points[:, 1],
+            z=hull_points[:, 2],
+            opacity=0.3,  # Adjust opacity as needed
+            color='red',  # Adjust hull color as needed
+            name=f'Hull {i + 1}'
+        )
+        traces.append(trace_hull)
+
+    # Create layout for the plot
+    layout = go.Layout(
+        title='XYZ Coordinates with Time and Hulls',
+        scene=dict(
+            xaxis=dict(title='X'),
+            yaxis=dict(title='Y'),
+            zaxis=dict(title='Z')
+        )
     )
+
+    # Create the figure
+    fig = go.Figure(data=traces, layout=layout)
+
+    # Show the plot
+    fig.show()
+
