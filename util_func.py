@@ -12,7 +12,6 @@ def extract_aa_sequence(structure):
                     amino_acid_sequence += residue.get_resname()
 
     return amino_acid_sequence
-
 def extract_all_atoms(structure):
     points0 = []
     for model in structure:
