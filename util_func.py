@@ -43,3 +43,10 @@ def conv_array_text(string_from_csv):
     else:
         return []
 
+def conv_array_coord(data):
+    coordinates_list = []
+    for key, values in data.items():
+        for value in values:
+            if len(value) == 3:
+                coordinates_list.append({'TimePoint': key, 'X': value[0], 'Y': value[1], 'Z': value[2]})
+    return coordinates_list
