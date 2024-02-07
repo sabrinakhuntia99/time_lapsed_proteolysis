@@ -71,14 +71,21 @@ def plot_xyz_coordinates_with_time_and_hulls(data, hull_layers):
         )
         traces.append(trace)
 
-    # Create a trace for each hull layer
+    # Define a list of colors for the hulls
+    hull_colors = ['red', 'green', 'blue', 'yellow', 'orange', 'purple', 'cyan', 'magenta', 'lime', 'pink']
+
+    # Create a trace for each hull layer with a unique color
     for i, hull_points in enumerate(hull_layers):
+        # Use modulo operation to repeat colors if there are more hulls than colors
+        color_index = i % len(hull_colors)
+        color = hull_colors[color_index]
+
         trace_hull = go.Mesh3d(
             x=hull_points[:, 0],
             y=hull_points[:, 1],
             z=hull_points[:, 2],
             opacity=0.3,  # Adjust opacity as needed
-            color='red',  # Adjust hull color as needed
+            color=color,  # Assign a unique color to each hull
             name=f'Hull {i + 1}'
         )
         traces.append(trace_hull)
@@ -98,4 +105,3 @@ def plot_xyz_coordinates_with_time_and_hulls(data, hull_layers):
 
     # Show the plot
     fig.show()
-
