@@ -47,12 +47,14 @@ def plot_hulls_for_time_points(conv_peptide_coord, hull_layers):
     plt.grid(True)
     plt.show()
 
-
 def plot_xyz_coordinates_with_time_and_hulls(data, hull_layers):
     # Create an empty list to store traces
     traces = []
 
-    # Iterate over the data list
+    # Create an empty dictionary to store detected points based on time point
+    detected_points = {}
+
+    # Iterate over the data list to group detected points based on time point
     for time_point_data in data:
         # Extract time point name and coordinates
         time_point = time_point_data['TimePoint']
@@ -60,16 +62,41 @@ def plot_xyz_coordinates_with_time_and_hulls(data, hull_layers):
         Y = time_point_data['Y']
         Z = time_point_data['Z']
 
-        # Create a scatter trace for the coordinates
-        trace = go.Scatter3d(
-            x=[X],
-            y=[Y],
-            z=[Z],
+        # Add coordinates to the detected points dictionary
+        if time_point in detected_points:
+            detected_points[time_point].append((X, Y, Z))
+        else:
+            detected_points[time_point] = [(X, Y, Z)]
+
+    # Create traces for detected points and segments for each time point
+    for time_point, points in detected_points.items():
+        # Sort points based on X coordinate (assuming X represents the detected direction)
+        points.sort(key=lambda p: p[0])
+
+        # Extract X, Y, Z coordinates from sorted points
+        X, Y, Z = zip(*points)
+
+        # Create scatter trace for detected points
+        trace_points = go.Scatter3d(
+            x=X,
+            y=Y,
+            z=Z,
             mode='markers',
-            marker=dict(size=5, color='blue'),  # Adjust marker size and color as needed
-            name=f'Time Point: {time_point}'  # Include the time point name in the trace name
+            marker=dict(size=8, color='white', symbol='square'),  # Adjust marker size and color as needed
+            name=f'Points at Time Point: {time_point}'  # Include time point name in trace name
         )
-        traces.append(trace)
+        traces.append(trace_points)
+
+        # Create line trace for detected segments
+        trace_detected = go.Scatter3d(
+            x=X,
+            y=Y,
+            z=Z,
+            mode='lines',
+            line=dict(color='white', width=4),  # Adjust line color and width as needed
+            name=f'Peptide at Time Point: {time_point}'  # Include time point name in trace name
+        )
+        traces.append(trace_detected)
 
     # Define a list of colors for the hulls
     hull_colors = ['red', 'green', 'blue', 'yellow', 'orange', 'purple', 'cyan', 'magenta', 'lime', 'pink']
@@ -90,14 +117,21 @@ def plot_xyz_coordinates_with_time_and_hulls(data, hull_layers):
         )
         traces.append(trace_hull)
 
-    # Create layout for the plot
+    # Create plot layout
+
     layout = go.Layout(
-        title='XYZ Coordinates with Time and Hulls',
+        title='Convex Layered Protein Structure with Detected Peptides (Cartesian Coordinates)',
         scene=dict(
-            xaxis=dict(title='X'),
-            yaxis=dict(title='Y'),
-            zaxis=dict(title='Z')
-        )
+            xaxis=dict(title='X', backgroundcolor="black", gridcolor="gray", showgrid=False),
+            yaxis=dict(title='Y', backgroundcolor="black", gridcolor="gray", showgrid=False),
+            zaxis=dict(title='Z', backgroundcolor="black", gridcolor="gray", showgrid=False),
+            bgcolor='black',
+            aspectmode="cube",
+        ),
+        paper_bgcolor='black',
+        plot_bgcolor='black',
+        showlegend=True,
+        legend=dict(x=0.85, y=0.95),
     )
 
     # Create the figure
