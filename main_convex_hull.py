@@ -1,4 +1,3 @@
-
 from __future__ import division
 from scipy.spatial import ConvexHull, Delaunay
 from Bio.PDB import *
@@ -6,12 +5,17 @@ import numpy as np
 import csv
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
+import pandas as pd
+from util_func import conv_array_text
 
+data_df = pd.read_csv("pep_cleave_coordinates_10292023.csv", index_col=0)
+data_df = data_df.applymap(conv_array_text)
 
-p=PDBParser()
+p = PDBParser()
 
 #  AlphaFold structure for test
-structure=p.get_structure('AF-O60361-F1-model_v4', r"C:\Users\Sabrina\PycharmProjects\structural_proteomics\venv\AF-O60361-F1-model_v4.pdb")
+structure = p.get_structure('AF-O60361-F1-model_v4',
+                            r"C:\Users\Sabrina\PycharmProjects\structural_proteomics\venv\AF-O60361-F1-model_v4.pdb")
 
 # Extract amino acid sequence from the first model and chain
 amino_acid_sequence = ""
@@ -121,7 +125,6 @@ xList = []
 yList = []
 zList = []
 
-
 peptide_O60361_available = False  # Flag to track availability
 
 for peptide in peptideList:
@@ -159,13 +162,14 @@ def convex_hull_peeling(points):
 
     return layers
 
+
 def calculate_max_distance_to_hull(centroid, hull_points):
     return max(np.linalg.norm(p - centroid) for p in hull_points)
+
 
 def check_vectors_within_max_distance(vectors, max_distance):
     within_max_distance = [np.linalg.norm(vector) <= max_distance for vector in vectors]
     return within_max_distance
-
 
 
 if __name__ == "__main__":
@@ -174,21 +178,26 @@ if __name__ == "__main__":
     layers = convex_hull_peeling(points)
     print("Number of Hulls:", len(layers))
 
-    # Initialize lists to store coordinates
-    x_coordinates = []
-    y_coordinates = []
-    z_coordinates = []
-
     # Initialize lists to store line segment coordinates
     peptide_lines_x = []
     peptide_lines_y = []
     peptide_lines_z = []
 
     # Extract coordinates for peptide O60361 from the peptideList
-    peptide_coordinates = []  # List to store extracted coordinates
+    peptide_coordinates = []  # List to store extracted coordinates:
+    #                         currentPoint = pointsInPeptide[point]
+    #                         # Extract coordinates and append to the list
+    #                         peptide_coordinates.append((currentPoint['x'], currentPoint['y'], currentPoint['z']))
+    #
+    #             # Create line segments from the extracted coordinates
+    #             for i in range(0, len(peptide_coordinates) - 1, 2):
+    #                 start_point = peptide_coordinates[i]
+    #                 end_point = peptide_coordinates[i + 1]
+    #
+    #                 #
 
     # Initialize a list to store line segments as tuples of start and end points
-    peptide_lines = []
+    peptide_lines = data_df[x,y]
 
     # Extract coordinates for peptide O60361 from the peptideList
     for peptide in peptideList:
@@ -197,17 +206,8 @@ if __name__ == "__main__":
             for i in peptide:
                 if i != 'name':  # Skip the 'name' key
                     pointsInPeptide = peptide[i]
-                    for point in pointsInPeptide:
-                        currentPoint = pointsInPeptide[point]
-                        # Extract coordinates and append to the list
-                        peptide_coordinates.append((currentPoint['x'], currentPoint['y'], currentPoint['z']))
-
-            # Create line segments from the extracted coordinates
-            for i in range(0, len(peptide_coordinates) - 1, 2):
-                start_point = peptide_coordinates[i]
-                end_point = peptide_coordinates[i + 1]
-
-                # Append each start and end point as a separate tuple
+                    for point in pointsInPeptide
+                        # Append each start and end point as a separate tuple
                 peptide_lines.extend([start_point, end_point])
             print(peptide_lines)
 
@@ -251,7 +251,6 @@ if __name__ == "__main__":
     print("\nEnd Points Coordinates:")
     for x, y, z in zip(trace_peptide_O60361_end['x'], trace_peptide_O60361_end['y'], trace_peptide_O60361_end['z']):
         print(f"({x}, {y}, {z})")
-
 
     trace_atomic = go.Scatter3d(
         x=points0[:, 0],
@@ -299,10 +298,9 @@ if __name__ == "__main__":
         name='Centroid'
     )
 
-
-
     # Combine relevant traces into a single list
-    combined_data = [trace_atomic, trace_amino_acid] + trace_hulls + [trace_peptide_O60361_start, trace_peptide_O60361_end, trace_peptide_lines]
+    combined_data = [trace_atomic, trace_amino_acid] + trace_hulls + [trace_peptide_O60361_start,
+                                                                      trace_peptide_O60361_end, trace_peptide_lines]
     combined_data_with_centroid = combined_data + [trace_centroid]
 
     # Create the layout
@@ -367,3 +365,30 @@ if __name__ == "__main__":
     else:
         print("Centroid is not inside any hull")
 
+# Lists to store time points and corresponding hull numbers detected
+time_points = []
+hull_numbers = []
+
+# Assuming 'peptide_coordinates' contains the points of interest within the peptide
+for peptide in peptideList:
+    if peptide['name'] == 'O60361':
+        for point in peptide_coordinates:
+            found_hull = None
+            for j, hull_points in enumerate(layers):
+                hull = ConvexHull(hull_points)
+                all_on_same_side = all(
+                    np.dot(eq[:-1], point) + eq[-1] <= 0 for eq in hull.equations
+                )
+                if all_on_same_side:
+                    time_points.append(1)  # Append a placeholder for time points
+                    hull_numbers.append(found_hull)
+                    break  # Break the loop after appending a hull number
+
+# Plotting the 2D graph
+plt.figure(figsize=(8, 6))
+plt.scatter(time_points, hull_numbers, marker='o', color='blue')
+plt.xlabel('Time Points')
+plt.ylabel('Detected Hull Number')
+plt.title('Detected Hull Numbers over Time')
+plt.grid(True)
+plt.show()

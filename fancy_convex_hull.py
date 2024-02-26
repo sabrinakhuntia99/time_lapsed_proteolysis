@@ -1,25 +1,13 @@
-from __future__ import division
+import numpy as np
+import plotly.graph_objs as go
 from scipy.spatial import ConvexHull
 from Bio.PDB import *
-import numpy as np
-import csv
-import plotly.graph_objs as go
-import ast
-import re
 
 p = PDBParser()
 
 # AlphaFold structure for tests
-structure = p.get_structure('test_1', r"C:\Users\Sabrina\PycharmProjects\structural_proteomics\venv\test_1.pdb")
-dna_points = []
-for model in structure:
-    for chain in model:
-        for residue in chain:
-            for atom in residue:
-                if atom.get_name() == "P":
-                    dna_point = atom.get_coord()
-                    dna_points.append(dna_point)
-dna_points = np.array(dna_points)
+structure = p.get_structure('O60361',
+                            r"C:\Users\Sabrina\PycharmProjects\structural_proteomics\venv\AF-O60361-F1-model_v4.pdb")
 
 prot_points = []
 for model in structure:
@@ -31,34 +19,42 @@ for model in structure:
                     prot_points.append(prot_point)
 prot_points = np.array(prot_points)
 
-# Merge DNA and protein points
-combined_points = np.concatenate((dna_points, prot_points))
-
-# Compute convex hull for combined points
-hull = ConvexHull(combined_points)
+# Compute convex hull for protein points
+hull = ConvexHull(prot_points)
 vertices = np.copy(hull.vertices)
-hull_points = np.copy(combined_points[vertices])
+hull_points = np.copy(prot_points[vertices])
 
-# Create a Plotly 3D scatter plot for combined DNA and protein coordinates with blue DNA portion
-trace_combined = go.Scatter3d(
-    x=combined_points[:, 0],
-    y=combined_points[:, 1],
-    z=combined_points[:, 2],
-    mode='markers+lines',  # Use markers and lines for the combined coordinates
-    marker=dict(size=5, color='rgba(0, 0, 255, 0.8)', opacity=0.8, symbol='circle'),  # Blue circles for DNA portion
-    line=dict(color='rgba(0, 0, 255, 0.6)', width=2),  # Translucent lines for connecting DNA points
-    name='Combined Coordinates'
+# Duplicate first point to ensure a closed surface
+hull_points = np.vstack([hull_points, hull_points[0]])
+
+# Create triangular faces for the hull surface
+hull_faces = []
+for i in range(len(hull.vertices) - 1):
+    hull_faces.append([i, i + 1, len(hull.vertices)])
+hull_faces.append([len(hull.vertices) - 1, 0, len(hull.vertices)])
+
+# Create a Plotly 3D scatter plot for protein coordinates
+trace_prot = go.Scatter3d(
+    x=prot_points[:, 0],
+    y=prot_points[:, 1],
+    z=prot_points[:, 2],
+    mode='markers+lines',  # Use markers and lines for the prot coordinates
+    marker=dict(size=5, color='rgba(0, 0, 255, 0.8)', opacity=0.8, symbol='circle'),  # Blue circles
+    line=dict(color='rgba(0, 0, 255, 0.6)', width=2),  # Translucent lines
+    name='Protein Coordinates'
 )
 
-# Create Plotly 3D surface plot for the single hull with purple color
+# Create a closed surface trace for the convex hull
 trace_hull = go.Mesh3d(
     x=hull_points[:, 0],
     y=hull_points[:, 1],
     z=hull_points[:, 2],
-    opacity=0.2,  # Set lower opacity for the hull
-    color='rgba(128, 0, 128, 0.6)',  # Purple color for the hull
-    lighting=dict(ambient=0.6, diffuse=0.8),  # Adjust lighting properties
-    name='Combined Hull'
+    i=hull_faces,
+    j=hull_faces,
+    k=hull_faces,
+    opacity=0.3,  # Adjust opacity as needed
+    color='blue',  # Assign a unique color to the hull
+    name='Convex Hull'
 )
 
 layout = go.Layout(
@@ -75,7 +71,7 @@ layout = go.Layout(
     legend=dict(x=0.85, y=0.95),
 )
 
-fig = go.Figure(data=[trace_combined, trace_hull], layout=layout)
+fig = go.Figure(data=[trace_prot, trace_hull], layout=layout)
 fig.update_layout(
     title='Fancy 3D Plot',
     scene=dict(
