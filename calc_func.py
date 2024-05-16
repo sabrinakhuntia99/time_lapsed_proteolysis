@@ -1,25 +1,47 @@
 from scipy.spatial import ConvexHull, Delaunay
 import numpy as np
-def convex_hull_peeling(points):
+def convex_hull_peeling(points, num_layers=10, min_points_percentage=0.1):
     hull = ConvexHull(points)
-    simplices = np.copy(hull.simplices)
-    hull_points = np.copy(points[simplices])
-    layers = [hull_points]
+    vertices = np.copy(hull.vertices)
+    hull_points = np.copy(points[vertices])
 
-    min_points_percentage = 0.1  # Adjust this percentage as needed
-    min_points = int(len(points) * min_points_percentage)
+    # Construct the original hull
+    original_hull = [hull_points]
 
-    while len(hull_points) > min_points:
-        try:
-            new_hull = ConvexHull(hull_points)
-            simplices = np.copy(new_hull.simplices)
-            hull_points = np.copy(points[simplices])
-            print(len(hull_points))
-            layers.append(hull_points)
-        except:
-            break
+    # Recursively construct scaled-down hulls
+    def scale_hull(points, layer_num):
+        if layer_num >= num_layers or len(points) <= min_points_percentage * len(original_hull[0]):
+            return []
+        else:
+            scale_factor = 1 - (layer_num / num_layers)  # Decreasing scale factor
+            scaled_points = scale_points(points, scale_factor)
+            new_hull = ConvexHull(scaled_points)
+            vertices = np.copy(new_hull.vertices)
+            hull_points = np.copy(scaled_points[vertices])
+            return [hull_points] + scale_hull(hull_points, layer_num + 1)
 
-    return layers
+    scaled_hulls = scale_hull(hull_points, 1)
+
+    return original_hull + scaled_hulls
+def calculate_centroid(points):
+    centroid = np.mean(points, axis=0)
+    return centroid
+
+def calculate_distance(point, centroid):
+    return np.linalg.norm(point - centroid)
+
+def calculate_average_distance(data):
+    average_distances = [0] * len(data)
+    for i, timepoint_data in enumerate(data):
+        centroid = calculate_centroid(data)
+        distances = [calculate_distance(point, centroid) for point in timepoint_data]
+        average_distances[i] = np.mean(distances)
+    return average_distances
+
+def scale_points(points, scale_factor):
+    centroid = np.mean(points, axis=0)
+    scaled_points = centroid + scale_factor * (points - centroid)
+    return scaled_points
 
 def delaunay_tessellation_peeling(points):
     delaunay = Delaunay(points)
@@ -59,8 +81,6 @@ def average_thickness(layers):
         avg_thickness = np.mean(layer_thickness)
         thicknesses.append(avg_thickness)
     return thicknesses
-
-
 
 def defined_convex_hull_peeling(points):
     # Calculate the protein width

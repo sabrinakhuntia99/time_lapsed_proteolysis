@@ -8,8 +8,8 @@ from graph_func import plot_xyz_coordinates_with_time_and_triangles, plot_triang
 p = PDBParser()
 
 #  AlphaFold structure for test
-structure = p.get_structure('O60361',
-                            r"C:\Users\Sabrina\PycharmProjects\structural_proteomics\venv\AF-O60361-F1-model_v4.pdb")
+structure = p.get_structure('Q02543',
+                            r"C:\Users\Sabrina\PycharmProjects\structural_proteomics\venv\AF-Q02543-F1-model_v4.pdb")
 
 # Extract amino acid sequence from the first model and chain
 print(extract_aa_sequence(structure))
@@ -30,7 +30,7 @@ data_df = data_df.applymap(conv_array_text)
 
 # Extract specific time-lapsed peptide cleave XYZ coordinates for a given UniProt ID (ex: O60361)
 # Protein ID should match with that of the AlphaFold file
-search_value = "O60361"
+search_value = "Q02543"
 peptide_coord = data_df.loc[search_value]
 
 

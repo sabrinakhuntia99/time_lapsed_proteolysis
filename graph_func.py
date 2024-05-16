@@ -240,3 +240,4 @@ def plot_xyz_coordinates_with_time_and_triangles(data, triangle_layers):
 
     # Show the plot
     fig.show()
+
