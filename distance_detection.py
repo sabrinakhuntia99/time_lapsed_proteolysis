@@ -2,21 +2,13 @@ from __future__ import division
 from Bio.PDB import *
 import pandas as pd
 import numpy as np
-from scipy.stats import pearsonr
 import os
 import re
-import matplotlib.pyplot as plt
-import seaborn as sns
+
 from util_func import conv_array_text, extract_backbone_atoms
 from tqdm import tqdm
 
 parse = PDBParser()
-
-# Extract all peptide cleavage XYZ coordinates (based on time point)
-data_df = pd.read_csv("pep_cleave_coordinates_10292023.csv", index_col=0)
-data_df = data_df.applymap(conv_array_text)
-
-
 # Atomic masses in Dalton (g/mol)
 atomic_masses = {
     'H': 1.008,
@@ -27,6 +19,11 @@ atomic_masses = {
     'S': 32.06,
     'SE': 78.96,
 }
+
+# Extract all peptide cleavage XYZ coordinates (based on time point)
+data_df = pd.read_csv("pep_cleave_coordinates_10292023.csv", index_col=0)
+data_df = data_df.applymap(conv_array_text)
+data_df = data_df[0:5]
 
 # Preallocate arrays for storing disorder_properties and CPI
 num_proteins = len(data_df.index)
@@ -100,13 +97,14 @@ pdb_paths_dict = get_pdb_file_paths(r"C:\Users\Sabrina\PycharmProjects\intrinsic
 # Loop through each protein to calculate disorder_properties and CPI
 for idx, uniprot_id in enumerate(data_df.index):
     try:
+        print(uniprot_id)
         # Get corresponding PDB file path
         pdb_file_path = pdb_paths_dict.get(uniprot_id)
 
         # Check if the PDB file exists
         if not os.path.isfile(pdb_file_path):
             print(f"PDB file not found for UniProt ID {uniprot_id}. Skipping...")
-            continue
+            continue  
 
         # Parse PDB file
         structure = parse.get_structure(uniprot_id, pdb_file_path)
@@ -120,35 +118,36 @@ for idx, uniprot_id in enumerate(data_df.index):
         # Calculate centroid of the protein structure
         points = extract_backbone_atoms(structure)
         centroid = np.mean(points, axis=0)
-
+        print(centroid)
+        dist_to_centroid = []
         # Calculate distance between each data coordinate and centroid
-        dist_to_centroid = [np.linalg.norm(coord - centroid) for coord in data_df.loc[uniprot_id, data_df.columns[1:]]]
-
+        for coord_array in data_df.loc[uniprot_id, data_df.columns[1:]]:
+            if coord_array:
+                print(coord_array)
+                dists_at_coord = [np.linalg.norm(coord - centroid) for coord in coord_array]
+                dist_to_centroid.append(np.average(dists_at_coord))
+#        dist_to_centroid = [np.linalg.norm(coord - centroid) for coord in data_df.loc[uniprot_id, data_df.columns[1:]]]
+#        avg_dist = np.average(dist_to_centroid)
+#        print(avg_dist)
+        print(dist_to_centroid)
         # Calculate CPI
-        data_df.loc[uniprot_id, 'CPI'] = dist_to_centroid
+        cpi_values = []
+        for i in range(len(dist_to_centroid) - 1):
+            if dist_to_centroid[i] < dist_to_centroid[i + 1]:
+                cpi_values.append(-1)  # Distance increases over time
+            elif dist_to_centroid[i] > dist_to_centroid[i + 1]:
+                cpi_values.append(1)  # Distance decreases over time
+            else:
+                cpi_values.append(0)  # Distance remains constant
+
+        # Assign the CPI values to the DataFrame
+        disorder_properties['CPI'][idx] = cpi_values
+
 
     except Exception as e:
-   #     print(f"An error occurred for UniProt ID {uniprot_id}: {e}")
+        # print(f"An error occurred for UniProt ID {uniprot_id}: {e}")
         continue
 
 # Convert disorder_properties dictionary to DataFrame
 disorder_properties_df = pd.DataFrame(disorder_properties)
-
-# Calculate correlation coefficients
-correlation_coefficients = {}
-for property_name in ['Density', 'Radius_of_Gyration', 'Surface_Area_to_Volume_Ratio', 'Sphericity']:
-    correlation_coefficient, _ = pearsonr(disorder_properties_df[property_name], data_df['CPI'])
-    correlation_coefficients[property_name] = correlation_coefficient
-
-# Print correlation coefficients
-print("Correlation Coefficients:")
-for property_name, coefficient in correlation_coefficients.items():
-    print(f"{property_name}: {coefficient}")
-
-# Plot the presence heatmap
-plt.figure(figsize=(14, 8))
-sns.heatmap(data_df['CPI'].transpose().to_frame(), cmap="coolwarm", cbar=False, annot=False)
-plt.xlabel('Protein')
-plt.ylabel('Timepoints')
-plt.title('CPI Values Over Time')
-plt.show()
+print(disorder_properties_df)
